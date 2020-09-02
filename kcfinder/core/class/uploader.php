@@ -421,19 +421,22 @@ class uploader {
         $rPath = realpath($file);
         if (strtoupper(substr(PHP_OS, 0, 3)) == "WIN")
             $rPath = str_replace("\\", "/", $rPath);
-        return (substr($rPath, 0, strlen($this->typeDir)) === $this->typeDir);
+        if (substr($rPath, 0, strlen($this->typeDir)) === $this->typeDir) {
+          return true;
+        }
+        return (strpos($file, '..') === false && strpos($file, $this->typeDir) == 0);
     }
 
     protected function checkFilename($file) {
-
         if ((basename($file) !== $file) ||
             (
                 isset($this->config['_normalizeFilenames']) &&
                 $this->config['_normalizeFilenames'] &&
                 preg_match('/[^0-9a-z\.\- _]/si', $file)
             )
-        )
-            return false;
+        ) {
+          return false;
+        }
 
         return true;
     }
