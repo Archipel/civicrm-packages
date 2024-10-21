@@ -36,13 +36,32 @@
  *
  */
 
+
 function checkAuthentication() {
   static $authenticated;
   if ( !isset( $authenticated ) ) {
-    $current_cwd   = getcwd();
-    $civicrm_root  = dirname(dirname(getcwd()));
     $authenticated = false;
-    require_once "{$civicrm_root}/civicrm.config.php";
+
+    // used to chdir at the end of this function - not sure if necessary?
+    $current_cwd = getcwd();
+
+    function findConfigFile(string $search_path): string {
+      while ($search_path) {
+        foreach(['civicrm.config.php', 'civicrm.standalone.php'] as $config_filename) {
+          $config_file_candidate = $search_path . DIRECTORY_SEPARATOR . $config_filename;
+
+          if (file_exists($config_file_candidate)) {
+            return $config_file_candidate;
+          }
+        }
+
+        $search_path = dirname($search_path);
+      }
+
+      throw new \Exception('KCFinder couldn\'t find civicrm.config.php or civicrm.standalone.php to check authentication');
+    }
+
+    require_once findConfigFile(__DIR__);
     require_once 'CRM/Core/Config.php';
 
     $config = CRM_Core_Config::singleton();
@@ -68,6 +87,9 @@ function checkAuthentication() {
       break;
     case 'Drupal8':
       $auth_function = 'authenticate_drupal8';
+      break;
+    case 'Standalone':
+      $auth_function = 'authenticate_standalone';
       break;
     }
     if(!$auth_function($config)) {
@@ -190,6 +212,10 @@ function authenticate_wordpress($config) {
   return false;
 }
 
+function authenticate_standalone($config) {
+  return CRM_Core_Permission::check('access CiviCRM');
+}
+
 function authenticate_joomla($config) {
   // make sure only logged in user can see upload / view images
   $joomlaBase = dirname(dirname(dirname(dirname(dirname(dirname(dirname(dirname(__FILE__))))))));
@@ -200,10 +226,25 @@ function authenticate_joomla($config) {
   require_once ( JPATH_BASE .DS.'includes'.DS.'defines.php' );
   require_once ( JPATH_BASE .DS.'includes'.DS.'framework.php' );
 
-  $mainframe = JFactory::getApplication('administrator');
-  $mainframe->initialise();
+  if (version_compare(JVERSION, '4.0.0', 'lt')) {
+    $mainframe = JFactory::getApplication('administrator');
+    $mainframe->initialise();
+    
+    $user_id = JFactory::getUser()->id;
+  } else {
+    // Boot the DI container.
+    $container = \Joomla\CMS\Factory::getContainer();
 
-  if (JFactory::getUser()->id == 0) {
+    // Alias the session service key to the web session service.
+    $container->alias(\Joomla\Session\SessionInterface::class, 'session.web.site');
+
+    // Get the application.
+    $app = $container->get(\Joomla\CMS\Application\AdministratorApplication::class);
+    
+    $user_id = Joomla\CMS\Factory::getUser()->id;
+  }
+
+  if ($user_id == 0) {
     return false;
   }
   return true;
