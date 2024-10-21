@@ -158,17 +158,18 @@ class uploader {
             $this->session = &$_SESSION;
 
         // SECURING THE SESSION
-        $stamp = array(
-            'ip' => $_SERVER['REMOTE_ADDR'],
-            'agent' => md5($_SERVER['HTTP_USER_AGENT'])
-        );
-        if (!isset($this->session['stamp']))
-            $this->session['stamp'] = $stamp;
-        elseif (!is_array($this->session['stamp']) || ($this->session['stamp'] !== $stamp)) {
-            if ($this->session['stamp']['ip'] === $stamp['ip'])
-                session_destroy();
-            die;
-        }
+        // Causes problems behind proxies or when REMOTE_ADDR is allowed to change
+        // $stamp = array(
+        //     'ip' => $_SERVER['REMOTE_ADDR'],
+        //     'agent' => md5($_SERVER['HTTP_USER_AGENT'])
+        // );
+        // if (!isset($this->session['stamp']))
+        //     $this->session['stamp'] = $stamp;
+        // elseif (!is_array($this->session['stamp']) || ($this->session['stamp'] !== $stamp)) {
+        //     if ($this->session['stamp']['ip'] === $stamp['ip'])
+        //         session_destroy();
+        //     die;
+        // }
 
         // IMAGE DRIVER INIT
         if (isset($this->config['imageDriversPriority'])) {
@@ -421,19 +422,22 @@ class uploader {
         $rPath = realpath($file);
         if (strtoupper(substr(PHP_OS, 0, 3)) == "WIN")
             $rPath = str_replace("\\", "/", $rPath);
-        return (substr($rPath, 0, strlen($this->typeDir)) === $this->typeDir);
+        if (substr($rPath, 0, strlen($this->typeDir)) === $this->typeDir) {
+          return true;
+        }
+        return (strpos($file, '..') === false && strpos($file, $this->typeDir) == 0);
     }
 
     protected function checkFilename($file) {
-
         if ((basename($file) !== $file) ||
             (
                 isset($this->config['_normalizeFilenames']) &&
                 $this->config['_normalizeFilenames'] &&
-                preg_match('/[^0-9a-z\.\- _]/si', $file)
+                preg_match('/[^0-9a-z\.\- _\(\)]/si', $file) // note `(1)` is added to file name when preventing overwrite
             )
-        )
-            return false;
+        ) {
+          return false;
+        }
 
         return true;
     }
