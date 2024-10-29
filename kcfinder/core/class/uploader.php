@@ -423,10 +423,7 @@ class uploader {
         $rPath = realpath($file);
         if (strtoupper(substr(PHP_OS, 0, 3)) == "WIN")
             $rPath = str_replace("\\", "/", $rPath);
-        if (substr($rPath, 0, strlen($this->typeDir)) === $this->typeDir) {
-          return true;
-        }
-        return (strpos($file, '..') === false && strpos($file, $this->typeDir) == 0);
+        return (substr($rPath, 0, strlen($this->typeDir)) === $this->typeDir);
     }
 
     protected function checkFilename($file) {
